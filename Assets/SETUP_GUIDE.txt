@@ -1,0 +1,296 @@
+================================================================================
+  SETUP GUIDE — Mini Drone Dispatcher
+  Step-by-step to get everything running in Unity
+================================================================================
+
+
+STEP 0 — OPEN THE PROJECT
+──────────────────────────
+- Open Unity Hub → Add project from disk → pick the Vrelax folder
+- Unity 6 (6000.3.x) required
+- Open Assets/Scenes/SampleScene
+
+
+STEP 1 — CREATE THE JOB ASSETS (one-click)
+───────────────────────────────────────────
+- Top menu → Tools → Drone Dispatcher → Create Default Jobs
+- This creates 3 ScriptableObject assets in Assets/Resources/Jobs/:
+    MedicalSupply.asset   (Hospital → Clinic)
+    PackageDelivery.asset (Warehouse → Residential)
+    FoodDelivery.asset    (Restaurant → Office)
+- You can open each asset to verify the fields
+
+
+STEP 2 — GENERATE THE SCENE LAYOUT (one-click)
+───────────────────────────────────────────────
+- In the scene, create an empty GameObject, name it "Bootstrapper"
+- Add component: SceneBootstrapper
+- Right-click the SceneBootstrapper component header → "Generate Scene Layout"
+- This creates:
+    Ground          — plane with NavMeshSurface (NavMesh auto-baked)
+    Obstacle_A..E   — cubes with NavMeshObstacle (carving)
+    Hospital        — red cylinder disc + Waypoint script (locationId = "Hospital")
+    Clinic          — red cylinder disc + Waypoint script
+    Warehouse       — yellow cylinder disc + Waypoint script
+    Residential     — yellow cylinder disc + Waypoint script
+    Restaurant      — magenta cylinder disc + Waypoint script
+    Office          — magenta cylinder disc + Waypoint script
+    Drone_01        — empty GO with NavMeshAgent + DroneController + DroneVisuals
+    Drone_02        — same
+    Drone_03        — same
+- Delete the Bootstrapper afterwards if you want (it's only an editor tool)
+
+
+STEP 3 — PLACE YOUR 3D DRONE MODEL
+────────────────────────────────────
+For each drone (Drone_01, Drone_02, Drone_03):
+
+  a) Drag your 3D drone model from the Project panel as a CHILD of Drone_01
+     Hierarchy should look like:
+
+       Drone_01                 ← has NavMeshAgent, DroneController, DroneVisuals
+         └── YourDroneModel     ← has Animator, your meshes, etc
+
+  b) Select parent "Drone_01"
+  c) In the DroneController component, assign the "Animator" field:
+     drag the child YourDroneModel (or wherever the Animator lives) into it
+  d) Repeat for Drone_02 and Drone_03
+
+
+STEP 4 — CONFIGURE THE ANIMATOR
+────────────────────────────────
+Your drone Animator should have a Bool parameter named exactly:
+
+    IsFlying
+
+The code sets this to true when the drone is moving and false when idle
+or performing a pickup/dropoff action.
+
+Suggested Animator setup:
+  - Default state: Idle
+  - Transition: Idle → Flying   (condition: IsFlying = true)
+  - Transition: Flying → Idle   (condition: IsFlying = false)
+  - Uncheck "Has Exit Time" on both transitions for instant switching
+
+
+STEP 5 — PLACE YOUR 3D CHECKPOINT MODEL (optional)
+───────────────────────────────────────────────────
+If you have a 3D checkpoint model:
+  - Drag it as a CHILD of each waypoint GO (Hospital, Clinic, etc.)
+  - The flat cylinder already serves as a ground marker
+  - Your 3D model sits on top visually
+
+Each waypoint already has a Waypoint script with the correct locationId.
+Do NOT rename the GameObjects — the system matches by locationId string.
+
+
+STEP 6 — SET UP ZENJECT (SceneContext + Installer)
+──────────────────────────────────────────────────
+a) Create empty GameObject, name it "--- SYSTEMS ---"
+b) Add component: SceneContext (from Zenject)
+c) In the SceneContext inspector, under "Mono Installers":
+   - Click "+" to add a slot
+   - Add component GameInstaller to the SAME "--- SYSTEMS ---" object
+   - Drag the GameInstaller component into the Mono Installers slot
+d) Add component: GameStartup to the SAME object
+   (this collects all waypoints at scene start)
+
+
+STEP 7 — BUILD THE UI
+──────────────────────
+Create a Canvas (UI → Canvas). Inside it, build this hierarchy:
+
+  Canvas
+    └── JobPanel               ← add JobPanelView script
+    │     └── Content          ← this is the scroll content / vertical layout
+    │
+    └── DronePanel             ← add DronePanelView script
+    │     └── Content          ← scroll content / vertical layout
+    │
+    └── DispatchPanel          ← add DispatchPanelView script
+    │     └── AssignButton     ← UI Button (TMP)
+    │     └── FeedbackLabel    ← TMP_Text
+    │
+    └── MissionProgress        ← add MissionProgressView script
+          └── ProgressSlider   ← UI Slider
+          └── MissionLabel     ← TMP_Text
+          └── StatusLabel      ← TMP_Text
+
+
+STEP 7a — CREATE THE ENTRY PREFABS
+───────────────────────────────────
+You need 2 small prefabs for the list rows:
+
+JOB ENTRY PREFAB (Assets/Prefabs/JobEntry):
+  Create a UI element (Panel or horizontal layout) with:
+    - TMP_Text  "nameLabel"     (shows job name)
+    - TMP_Text  "statusLabel"   (shows Pending/Assigned/etc)
+    - Button    "selectButton"  (the whole row or a small button)
+    - Image     "background"    (the panel background, for highlight)
+  Add the JobEntryView script to it.
+  Wire the 4 serialized fields in the inspector.
+  Drag into Assets/Prefabs/ to make it a prefab.
+
+DRONE ENTRY PREFAB (Assets/Prefabs/DroneEntry):
+  Same idea:
+    - TMP_Text  "nameLabel"     (drone name: Alpha/Bravo/Charlie)
+    - TMP_Text  "stateLabel"    (Idle/MovingToPickup/etc)
+    - TMP_Text  "jobLabel"      (current job id or "—")
+    - Button    "selectButton"
+    - Image     "background"
+  Add the DroneEntryView script to it.
+  Wire the 5 serialized fields.
+  Drag into Assets/Prefabs/ to make it a prefab.
+
+
+STEP 7b — WIRE THE PANEL VIEWS
+───────────────────────────────
+JobPanelView:
+  - "Content Parent" → drag the Content child (where entries spawn)
+  - "Entry Prefab"   → drag the JobEntry prefab from Assets/Prefabs/
+
+DronePanelView:
+  - "Content Parent" → drag the Content child
+  - "Entry Prefab"   → drag the DroneEntry prefab from Assets/Prefabs/
+
+DispatchPanelView:
+  - "Assign Button"   → drag the AssignButton
+  - "Feedback Label"  → drag the FeedbackLabel
+
+MissionProgressView:
+  - "Progress Slider" → drag the ProgressSlider
+  - "Mission Label"   → drag the MissionLabel
+  - "Status Label"    → drag the StatusLabel
+
+
+STEP 8 — REBAKE NAVMESH (if you moved things)
+──────────────────────────────────────────────
+- Select the Ground object
+- In NavMeshSurface component → click "Bake"
+- Make sure your obstacles are inside the baked area
+
+
+STEP 9 — HIT PLAY
+──────────────────
+What should happen:
+  1. UI shows 3 jobs (Medical Supply, Package Delivery, Food Delivery) as "Pending"
+  2. UI shows 3 drones (Alpha, Bravo, Charlie) as "Idle"
+  3. Click a job row to select it (highlights blue)
+  4. Click a drone row to select it (highlights blue)
+  5. Click "Assign" button
+  6. Feedback label shows "Assigned Medical Supply to Alpha."
+  7. Drone's Animator switches to Flying
+  8. Drone navigates to pickup waypoint (e.g. Hospital)
+  9. Arrives → pauses 1.5s (small bounce, Animator back to Idle)
+  10. Then flies to dropoff waypoint (e.g. Clinic)
+  11. Arrives → pauses 1.5s
+  12. Flies back to starting position
+  13. Job shows "Completed", drone shows "Idle" again
+  14. Mission progress slider updates throughout
+
+Can't assign the same job twice.
+Can't assign a busy drone.
+Feedback label tells you why if you try.
+
+
+================================================================================
+  HIERARCHY SUMMARY (what your scene should look like)
+================================================================================
+
+  SampleScene
+    ├── Main Camera
+    ├── Directional Light
+    │
+    ├── --- SYSTEMS ---          [SceneContext, GameInstaller, GameStartup]
+    │
+    ├── Ground                   [Plane, NavMeshSurface, MeshCollider]
+    │
+    ├── Obstacle_A               [Cube, NavMeshObstacle (carving)]
+    ├── Obstacle_B
+    ├── Obstacle_C
+    ├── Obstacle_D
+    ├── Obstacle_E
+    │
+    ├── Hospital                 [Cylinder, Waypoint (locationId="Hospital")]
+    │   └── (your 3D checkpoint model, optional)
+    ├── Clinic                   [Cylinder, Waypoint (locationId="Clinic")]
+    ├── Warehouse                [Cylinder, Waypoint (locationId="Warehouse")]
+    ├── Residential              [Cylinder, Waypoint (locationId="Residential")]
+    ├── Restaurant               [Cylinder, Waypoint (locationId="Restaurant")]
+    ├── Office                   [Cylinder, Waypoint (locationId="Office")]
+    │
+    ├── Drone_01                 [NavMeshAgent, DroneController, DroneVisuals]
+    │   └── YourDroneModel       [Animator]
+    ├── Drone_02                 [NavMeshAgent, DroneController, DroneVisuals]
+    │   └── YourDroneModel
+    ├── Drone_03                 [NavMeshAgent, DroneController, DroneVisuals]
+    │   └── YourDroneModel
+    │
+    └── Canvas                   [Canvas, CanvasScaler, GraphicRaycaster]
+        ├── JobPanel             [JobPanelView]
+        │   └── Content
+        ├── DronePanel           [DronePanelView]
+        │   └── Content
+        ├── DispatchPanel        [DispatchPanelView]
+        │   ├── AssignButton
+        │   └── FeedbackLabel
+        └── MissionProgress      [MissionProgressView]
+            ├── ProgressSlider
+            ├── MissionLabel
+            └── StatusLabel
+
+
+================================================================================
+  SCRIPT REFERENCE — what goes on what
+================================================================================
+
+Script                Where to put it              Required wiring
+─────────────────     ──────────────────────────   ─────────────────────────────
+SceneContext          --- SYSTEMS ---               Mono Installers → GameInstaller
+GameInstaller         --- SYSTEMS ---               (auto — it's a MonoInstaller)
+GameStartup           --- SYSTEMS ---               (auto — [Inject])
+
+DroneController       Drone_01/02/03 root          Animator field → child model
+DroneVisuals          Drone_01/02/03 root          (optional rotor transform)
+NavMeshAgent          Drone_01/02/03 root          (auto-added by bootstrapper)
+
+Waypoint              Hospital, Clinic, etc.       locationId field (auto-filled)
+
+JobPanelView          JobPanel (UI)                Content Parent, Entry Prefab
+DronePanelView        DronePanel (UI)              Content Parent, Entry Prefab
+DispatchPanelView     DispatchPanel (UI)           Assign Button, Feedback Label
+MissionProgressView   MissionProgress (UI)         Slider, Mission Label, Status Label
+JobEntryView          Prefab (Assets/Prefabs/)     nameLabel, statusLabel, selectButton, background
+DroneEntryView        Prefab (Assets/Prefabs/)     nameLabel, stateLabel, jobLabel, selectButton, background
+
+
+================================================================================
+  TROUBLESHOOTING
+================================================================================
+
+"Drone doesn't move"
+  → Rebake NavMesh on Ground
+  → Check NavMeshAgent is on the root drone GO (not the child model)
+  → Check waypoints are on the NavMesh (not floating)
+
+"Job list is empty"
+  → Run Tools → Drone Dispatcher → Create Default Jobs
+  → Check Assets/Resources/Jobs/ has 3 .asset files
+
+"Drone can't find waypoint"
+  → Make sure each waypoint GO has a Waypoint script
+  → locationId must match EXACTLY: Hospital, Clinic, Warehouse, Residential, Restaurant, Office
+  → Check Console for "[WaypointRegistry] Collected X waypoints"
+
+"ZenjectException: missing binding"
+  → Make sure GameInstaller is in the SceneContext Mono Installers list
+  → Make sure SceneContext exists in the scene
+
+"Animator doesn't switch"
+  → Animator needs a Bool parameter named exactly "IsFlying"
+  → DroneController.Animator field must be assigned (drag child model)
+  → Transitions need "Has Exit Time" unchecked
+
+"Assign button does nothing"
+  → Select a job AND a drone first (both highlight blue)
+  → Check feedback label — it tells you if drone is busy or job is taken

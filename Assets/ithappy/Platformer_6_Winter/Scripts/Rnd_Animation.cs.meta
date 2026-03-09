@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ebefcca1ebd1220478b28a69b9bea5b3
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 277072
+  packageName: Platformer 6 Winter - Low Poly 3D Models Pack
+  packageVersion: 2.1
+  assetPath: Assets/ithappy/Platformer_6_Winter/Scripts/Rnd_Animation.cs
+  uploadId: 782597

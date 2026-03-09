@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 7143f34cb2088484fb4a001a5268ed2f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 277072
+  packageName: Platformer 6 Winter - Low Poly 3D Models Pack
+  packageVersion: 2.1
+  assetPath: Assets/ithappy/Platformer_6_Winter/Scripts/RotationScript.cs
+  uploadId: 782597
