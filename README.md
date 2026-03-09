@@ -13,7 +13,7 @@ Built as an architecture assignment — focus on code quality, DI, and MVVM, not
    - A **SceneContext** GameObject with `GameInstaller` added under Mono Installers.
    - A baked **NavMeshSurface** on the ground plane (Component → AI → NavMesh Surface → Bake).
    - 3 drone GameObjects with `DroneController` + `NavMeshAgent` + `DroneVisuals`.
-   - 6 waypoint GameObjects named: `Hospital`, `Clinic`, `Warehouse`, `Residential`, `Restaurant`, `Office`.
+   - 4 waypoint GameObjects named: `bob1`, `bob2`, `bob3`, `bob4`.
    - 3 `JobDefinition` ScriptableObject assets in `Assets/Resources/Jobs/`.
    - A Canvas with `JobPanelView`, `DronePanelView`, `DispatchPanelView`.
 4. Hit **Play**.
@@ -21,49 +21,32 @@ Built as an architecture assignment — focus on code quality, DI, and MVVM, not
 ### Creating the Job Definitions
 
 Right-click in Project → **Create → Drone Dispatcher → Job Definition**.  
-Create 3 assets in `Assets/Resources/Jobs/`:
+Create 3 assets in `Assets/Resources/Jobs/` with random job names:
 
 | Asset name       | jobId  | jobName          | pickupLocationName | dropoffLocationName |
 |------------------|--------|------------------|--------------------|---------------------|
-| MedicalSupply    | job_01 | Medical Supply   | Hospital           | Clinic              |
-| PackageDelivery  | job_02 | Package Delivery | Warehouse          | Residential         |
-| FoodDelivery     | job_03 | Food Delivery    | Restaurant         | Office              |
+| Job1             | job_01 | (random)         | bob1               | bob2                |
+| Job2             | job_02 | (random)         | bob3               | bob4                |
+| Job3             | job_03 | (random)         | bob1               | bob3                |
 
 ---
 
 ## High-Level Architecture
 
-```
-┌──────────────────────────────────────────────────────┐
-│ Zenject (SceneContext + GameInstaller)                │
-│                                                      │
-│  ┌─────────────┐  ┌───────────────┐  ┌───────────┐  │
-│  │ IJobService  │  │IDroneRegistry │  │IDispatcher │  │
-│  │  (JobService)│  │(DroneRegistry)│  │(Dispatcher)│  │
-│  └──────┬──────┘  └──────┬────────┘  └─────┬─────┘  │
-│         │                │                  │        │
-│         ▼                ▼                  ▼        │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │              Zenject SignalBus                   │ │
-│  │   JobStatusChangedSignal  DroneStateChanged...  │ │
-│  └──────────┬──────────────────────┬───────────────┘ │
-│             │                      │                 │
-│  ┌──────────▼──────────┐  ┌───────▼──────────────┐  │
-│  │   JobPanelViewModel │  │ DronePanelViewModel   │  │
-│  │  DispatchViewModel  │  │                       │  │
-│  └──────────┬──────────┘  └───────┬──────────────┘  │
-│             │(C# events)          │(C# events)       │
-│  ┌──────────▼──────────┐  ┌───────▼──────────────┐  │
-│  │  JobPanelView (UI)  │  │  DronePanelView (UI) │  │
-│  │DispatchPanelView(UI)│  │                       │  │
-│  └─────────────────────┘  └──────────────────────┘  │
-│                                                      │
-│  ┌─────────────────┐                                 │
-│  │ DroneController  │  NavMeshAgent + state machine  │
-│  │ DroneVisuals     │  DOTween hover/bob             │
-│  └─────────────────┘                                 │
-└──────────────────────────────────────────────────────┘
-```
+The project uses Zenject for dependency injection with a SceneContext and GameInstaller.
+
+At the core are three main services:
+- IJobService (JobService) - manages job lifecycle and status
+- IDroneRegistry (DroneRegistry) - tracks available drones
+- IDispatcher (Dispatcher) - handles job assignment to drones
+
+These services communicate through Zenject SignalBus, firing signals like JobStatusChangedSignal and DroneStateChanged.
+
+The signals flow to ViewModels (JobPanelViewModel, DronePanelViewModel, DispatchViewModel) which handle presentation logic.
+
+ViewModels expose C# events that Views (JobPanelView, DronePanelView, DispatchPanelView) subscribe to for UI updates.
+
+DroneController and DroneVisuals handle the drone movement using NavMeshAgent and DOTween for visual effects.
 
 ### Layers
 
