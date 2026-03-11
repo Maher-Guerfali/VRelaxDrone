@@ -8,13 +8,15 @@ using Zenject;
 
 namespace DroneDispatcher.MVVM.Views
 {
-// Shows a progress slider for the currently active mission.
-// Attach to a panel that has a Slider + label.
+// Displays a progress bar for the currently active delivery mission.
+// Shows the job name, drone name + state, and a slider from 0–1.
+// Subscribes directly to Zenject signals (instead of going through a ViewModel)
+// because it needs to react to both drone and job changes.
 public class MissionProgressView : MonoBehaviour
 {
-    [SerializeField] Slider progressSlider;
-    [SerializeField] TMP_Text missionLabel;
-    [SerializeField] TMP_Text statusLabel;
+    [SerializeField] Slider progressSlider;  // 0–1 progress bar
+    [SerializeField] TMP_Text missionLabel;  // shows job name
+    [SerializeField] TMP_Text statusLabel;   // shows drone name + current state
 
     JobPanelViewModel _jobVM;
     DronePanelViewModel _droneVM;
@@ -82,7 +84,7 @@ public class MissionProgressView : MonoBehaviour
         missionLabel.text = job.Name;
         statusLabel.text = $"{activeDrone.DisplayName} — {activeDrone.State}";
 
-        // map drone state to progress 0..1
+        // Map each drone state to a rough progress percentage
         float progress = activeDrone.State switch
         {
             DroneState.Idle => 0f,

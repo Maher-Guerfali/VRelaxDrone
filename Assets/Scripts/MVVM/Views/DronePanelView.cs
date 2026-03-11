@@ -6,10 +6,13 @@ using Zenject;
 
 namespace DroneDispatcher.MVVM.Views
 {
+// Displays the list of drones in the UI.
+// Similar to JobPanelView but with a twist: drones register themselves in Start(),
+// so we need to wait one frame before the first Refresh() to make sure they're all registered.
 public class DronePanelView : MonoBehaviour
 {
-    [SerializeField] Transform contentParent;
-    [SerializeField] DroneEntryView entryPrefab;
+    [SerializeField] Transform contentParent;     // ScrollView content container
+    [SerializeField] DroneEntryView entryPrefab;  // prefab for a single drone row
 
     DronePanelViewModel _vm;
     readonly List<DroneEntryView> _entries = new List<DroneEntryView>();
@@ -32,16 +35,17 @@ public class DronePanelView : MonoBehaviour
 
     void Start()
     {
-        // Drones register in their Start(), so wait a frame before first build
+        // Wait one frame so all DroneControllers have time to register in their Start()
         StartCoroutine(DelayedRefresh());
     }
 
     IEnumerator DelayedRefresh()
     {
-        yield return null;
-        _vm.Refresh();
+        yield return null;  // skip one frame
+        _vm.Refresh();      // now DroneRegistry has all drones
     }
 
+    // Same pattern as JobPanelView: destroy all entries and recreate
     void Rebuild()
     {
         foreach (var e in _entries) Destroy(e.gameObject);

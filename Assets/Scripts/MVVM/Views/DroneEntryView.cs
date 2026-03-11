@@ -5,7 +5,9 @@ using UnityEngine.UI;
 
 namespace DroneDispatcher.MVVM.Views
 {
-// Single row in the drone list.
+// A single row in the drone list UI. Similar to JobEntryView but with extra fields.
+// Also has an optional RawImage that can show the drone's live camera feed.
+// Uses DroneCameraFeedSource's static registry to find the right RenderTexture.
 public class DroneEntryView : MonoBehaviour
 {
     [SerializeField] TMP_Text nameLabel;

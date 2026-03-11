@@ -3,16 +3,21 @@ using UnityEngine;
 
 namespace DroneDispatcher.Services
 {
+// Interface so we can inject this anywhere without coupling to the concrete class
 public interface IWaypointRegistry
 {
     void CollectAll();
     Transform GetLocation(string locationId);
 }
 
+// Scans the scene for all Waypoint components and maps their locationId to their Transform.
+// This way, when a drone needs to fly to "Hospital", it asks WaypointRegistry.GetLocation("Hospital")
+// and gets the actual world position. Called once at startup by GameStartup.Start().
 public class WaypointRegistry : IWaypointRegistry
 {
     readonly Dictionary<string, Transform> _map = new Dictionary<string, Transform>();
 
+    // Find every Waypoint component in the scene and build the lookup dictionary
     public void CollectAll()
     {
         _map.Clear();
@@ -30,6 +35,7 @@ public class WaypointRegistry : IWaypointRegistry
         Debug.Log($"[WaypointRegistry] Collected {_map.Count} waypoints");
     }
 
+    // Look up where a location is in the world. Returns null if not found.
     public Transform GetLocation(string locationId)
     {
         _map.TryGetValue(locationId, out var t);

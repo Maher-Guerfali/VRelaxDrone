@@ -5,10 +5,14 @@ using Zenject;
 
 namespace DroneDispatcher.MVVM.Views
 {
+// Displays the list of available jobs in the UI.
+// Subscribes to JobPanelViewModel.OnJobsUpdated and rebuilds the entire list
+// whenever a job's status changes. Each row is a JobEntryView prefab instance.
+// This is a "dumb" View — it just renders what the ViewModel tells it to.
 public class JobPanelView : MonoBehaviour
 {
-    [SerializeField] Transform contentParent;
-    [SerializeField] JobEntryView entryPrefab;
+    [SerializeField] Transform contentParent;   // the ScrollView content container
+    [SerializeField] JobEntryView entryPrefab;  // prefab for a single job row
 
     JobPanelViewModel _vm;
     readonly List<JobEntryView> _entries = new List<JobEntryView>();
@@ -21,7 +25,7 @@ public class JobPanelView : MonoBehaviour
 
     void OnEnable()
     {
-        _vm.OnJobsUpdated += Rebuild;
+        _vm.OnJobsUpdated += Rebuild;  // rebuild UI whenever jobs change
     }
 
     void OnDisable()
@@ -31,13 +35,14 @@ public class JobPanelView : MonoBehaviour
 
     void Start()
     {
-        // Zenject initializes JobPanelViewModel (IInitializable), so just render current state.
+        // First render — Zenject already called JobPanelViewModel.Initialize() by now
         Rebuild();
     }
 
+    // Destroy all existing entries and recreate from scratch.
+    // Simple approach — works well for small lists. For large lists we'd use object pooling.
     void Rebuild()
     {
-        // clear old entries
         foreach (var e in _entries) Destroy(e.gameObject);
         _entries.Clear();
 
@@ -50,11 +55,11 @@ public class JobPanelView : MonoBehaviour
         }
     }
 
+    // Called when user clicks a job row — tell ViewModel and update highlights
     void OnJobSelected(string jobId)
     {
         _vm.SelectJob(jobId);
 
-        // refresh highlights
         for (int i = 0; i < _vm.Jobs.Count && i < _entries.Count; i++)
             _entries[i].SetSelected(_vm.Jobs[i].Id == jobId);
     }

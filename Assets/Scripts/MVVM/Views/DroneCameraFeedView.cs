@@ -7,6 +7,10 @@ using Zenject;
 
 namespace DroneDispatcher.MVVM.Views
 {
+// Shows a live camera feed from the selected drone.
+// Uses RawImage + RenderTexture — each drone has a DroneCameraFeedSource
+// that renders to its own texture. When the user selects a drone, we swap
+// the RawImage texture to show that drone's camera feed.
 public class DroneCameraFeedView : MonoBehaviour
 {
     [SerializeField] RawImage feedImage;

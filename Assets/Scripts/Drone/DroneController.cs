@@ -9,16 +9,24 @@ using Zenject;
 
 namespace DroneDispatcher.Drone
 {
+// The main brain of each drone in the scene.
+// This MonoBehaviour lives on the drone GameObject alongside NavMeshAgent.
+// It creates a DroneModel (pure data) in Start(), registers with DroneRegistry,
+// and then manages the full delivery state machine:
+// Idle → MovingToPickup → PickingUp → MovingToDropoff → DroppingOff → Returning → Idle
+//
+// Zenject injects our services through the Construct method (field injection alternative).
+// The NavMeshAgent handles all the actual pathfinding on the baked NavMesh.
 [RequireComponent(typeof(NavMeshAgent))]
 public class DroneController : MonoBehaviour
 {
     [Header("Identity")]
-    [SerializeField] string droneId;
-    [SerializeField] string displayName = "Drone";
+    [SerializeField] string droneId;               // unique ID, e.g. "Drone_01"
+    [SerializeField] string displayName = "Drone";  // friendly name for UI, e.g. "Alpha"
 
     [Header("Movement")]
-    [SerializeField] float actionDuration = 1.5f;
-    [SerializeField] float arrivedThreshold = 0.5f;
+    [SerializeField] float actionDuration = 1.5f;   // how long pickup/dropoff animations take
+    [SerializeField] float arrivedThreshold = 0.5f;  // how close we need to be to count as "arrived"
 
     [Header("Animation — assign the Animator on your 3D drone model")]
     [SerializeField] Animator animator;
@@ -29,21 +37,23 @@ public class DroneController : MonoBehaviour
     bool _loggedMissingFlyingBool;
 
     NavMeshAgent _agent;
-    DroneModel _model;
-    JobModel _currentJob;
+    DroneModel _model;        // the pure-data model that tracks our state
+    JobModel _currentJob;     // the job we're currently working on
 
+    // These get injected by Zenject — we never create them ourselves
     IJobService _jobService;
     IDroneRegistry _registry;
     IWaypointRegistry _waypoints;
 
-    Transform _pickupTarget;
-    Transform _dropoffTarget;
+    Transform _pickupTarget;   // where we pick up the package
+    Transform _dropoffTarget;  // where we deliver it
     float _totalDistance;
     float _coveredDistance;
 
-    // 0..1 how far along the current leg the drone is
+    // 0..1 progress for the UI progress bar
     public float MissionProgress { get; private set; }
 
+    // Zenject calls this instead of a regular constructor (MonoBehaviours can't have constructors)
     [Inject]
     public void Construct(IJobService jobService, IDroneRegistry registry, IWaypointRegistry waypoints)
     {
@@ -58,7 +68,7 @@ public class DroneController : MonoBehaviour
         _agent.updateRotation = true;
         _agent.updateUpAxis = false;
 
-        // if animator wasn't assigned, try to find it in children
+        // if animator wasn't manually assigned in the inspector, search children
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
 
@@ -67,13 +77,16 @@ public class DroneController : MonoBehaviour
 
     void Start()
     {
+        // Create our data model and register with the global drone registry.
+        // We save transform.position as the "base" so the drone knows where to return after a job.
         _model = new DroneModel(droneId, displayName, transform.position);
         _registry.Register(_model);
         _model.OnStateChanged += OnDroneStateChanged;
 
-        SetFlying(false);
+        SetFlying(false);  // start grounded
     }
 
+    // Runs every frame — we only care about movement states
     void Update()
     {
         if (_model == null) return;
@@ -83,19 +96,19 @@ public class DroneController : MonoBehaviour
             case DroneState.MovingToPickup:
             case DroneState.MovingToDropoff:
             case DroneState.Returning:
-                UpdateProgress();
-                CheckArrival();
+                UpdateProgress();  // update the 0..1 progress for UI
+                CheckArrival();    // did we reach our destination?
                 break;
         }
     }
 
-    // Called after Dispatcher validates the assignment.
-    // Called by DispatchPanelView after user assigns this drone to a job
+    // Called by DispatchPanelView after the Dispatcher validates the assignment.
+    // This is where the drone actually starts moving.
     public void StartJob(JobModel job)
     {
         _currentJob = job;
 
-        // Find the actual waypoint transforms in the scene by name
+        // Look up the actual world positions from waypoint names
         _pickupTarget = _waypoints.GetLocation(job.PickupLocationName);
         _dropoffTarget = _waypoints.GetLocation(job.DropoffLocationName);
 
@@ -107,18 +120,19 @@ public class DroneController : MonoBehaviour
         }
 
         SetFlying(true);
-        NavigateTo(_pickupTarget.position);
+        NavigateTo(_pickupTarget.position);  // start heading to pickup
     }
 
-    // Called every frame while drone is moving
+    // Checks if we've arrived at our current destination and decides what to do next.
+    // This is the core of the state machine.
     void CheckArrival()
     {
-        if (_agent.pathPending) return;
-        if (_agent.remainingDistance > arrivedThreshold) return;
+        if (_agent.pathPending) return;                          // NavMesh still calculating path
+        if (_agent.remainingDistance > arrivedThreshold) return;  // not close enough yet
 
-        // State machine: what to do when we arrive at current destination
         switch (_model.State)
         {
+            // Arrived at pickup → play pickup animation, then head to dropoff
             case DroneState.MovingToPickup:
                 StartCoroutine(PerformAction(DroneState.PickingUp, () =>
                 {
@@ -128,6 +142,7 @@ public class DroneController : MonoBehaviour
                 }));
                 break;
 
+            // Arrived at dropoff → play drop animation, then head home
             case DroneState.MovingToDropoff:
                 StartCoroutine(PerformAction(DroneState.DroppingOff, () =>
                 {
@@ -137,30 +152,36 @@ public class DroneController : MonoBehaviour
                 }));
                 break;
 
+            // Arrived back at base → mission complete, go idle
             case DroneState.Returning:
                 SetFlying(false);
                 MissionProgress = 0f;
                 _currentJob = null;
-                _model.ClearJob();
+                _model.ClearJob();  // this sets state to Idle and clears the job reference
                 break;
         }
     }
 
+    // Plays a pickup/dropoff animation using DOTween punch scale effect.
+    // Stops the NavMeshAgent during the action, then resumes movement.
     IEnumerator PerformAction(DroneState actionState, System.Action onComplete)
     {
         _model.SetState(actionState);
-        _agent.isStopped = true;
-        SetFlying(false);
+        _agent.isStopped = true;   // pause navigation
+        SetFlying(false);          // land animation
 
+        // Quick "bounce" effect to make it look like the drone is picking up / dropping off
         transform.DOPunchScale(Vector3.one * 0.12f, actionDuration * 0.5f, 2);
 
         yield return new WaitForSeconds(actionDuration);
 
-        _agent.isStopped = false;
-        SetFlying(true);
+        _agent.isStopped = false;  // resume navigation
+        SetFlying(true);           // take off again
         onComplete?.Invoke();
     }
 
+    // Calculates a 0..1 overall mission progress for the UI progress bar.
+    // The mission is split into legs: pickup (0-35%), dropoff (35-75%), return (75-100%).
     void UpdateProgress()
     {
         if (_totalDistance < 0.1f) return;
@@ -178,6 +199,7 @@ public class DroneController : MonoBehaviour
         MissionProgress = leg + Mathf.Clamp01(_coveredDistance / _totalDistance) * legWeight;
     }
 
+    // Tell the NavMeshAgent to pathfind to a world position
     void NavigateTo(Vector3 worldPos)
     {
         _agent.SetDestination(worldPos);
@@ -185,6 +207,7 @@ public class DroneController : MonoBehaviour
         _coveredDistance = 0f;
     }
 
+    // Toggle the "IsFlying" bool on the Animator (controls idle vs fly animation)
     void SetFlying(bool flying)
     {
         if (animator == null || !_hasFlyingBool)
@@ -201,6 +224,8 @@ public class DroneController : MonoBehaviour
         animator.SetBool(_flyingBoolHash, flying);
     }
 
+    // On Awake, find the Animator bool parameter hash for fast lookups.
+    // Checks multiple common naming conventions in case the animator uses a different one.
     void CacheFlyingBoolParameter()
     {
         _hasFlyingBool = false;
@@ -209,7 +234,6 @@ public class DroneController : MonoBehaviour
         if (animator == null)
             return;
 
-        // Try inspector-defined name first, then common variants.
         var candidateNames = new[] { flyingBoolParameter, "IsFlying", "isFlying", "isFLying" };
         for (int i = 0; i < candidateNames.Length; i++)
         {
@@ -244,10 +268,11 @@ public class DroneController : MonoBehaviour
 
     void OnDroneStateChanged(DroneModel drone)
     {
-        // signals propagated through DroneRegistry → SignalBus
+        // State change is propagated through DroneRegistry → SignalBus → UI automatically
     }
 
     public DroneModel Model => _model;
     public string DroneId => droneId;
+}
 }
 }

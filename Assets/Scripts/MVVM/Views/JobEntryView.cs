@@ -4,7 +4,9 @@ using UnityEngine.UI;
 
 namespace DroneDispatcher.MVVM.Views
 {
-// Single row in the job list. Instantiated at runtime by JobPanelView.
+// A single row in the job list UI. Instantiated at runtime by JobPanelView.
+// It's a prefab with a name label, status label, select button, and background highlight.
+// Has no logic — just receives data via Setup() and forwards clicks via callback.
 public class JobEntryView : MonoBehaviour
 {
     [SerializeField] TMP_Text nameLabel;

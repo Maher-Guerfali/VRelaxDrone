@@ -4,9 +4,11 @@ using Zenject;
 
 namespace DroneDispatcher
 {
-// Put this on the SceneContext GameObject (or any GO in the scene).
-// Zenject calls [Inject] after Awake but before Start, so we
-// collect waypoints in Start — before DroneControllers get jobs.
+// Runs once at scene load to collect all waypoint locations.
+// Lives on the SceneContext GameObject (or any GO in the scene).
+// Zenject calls [Inject] after Awake but before Start, so by the time Start() runs
+// we have our WaypointRegistry ready. We collect waypoints here (before DroneControllers
+// try to use them in their Start methods).
 public class GameStartup : MonoBehaviour
 {
     IWaypointRegistry _waypoints;
@@ -19,6 +21,7 @@ public class GameStartup : MonoBehaviour
 
     void Start()
     {
+        // Scan the scene for all Waypoint components and build the name→transform lookup
         _waypoints.CollectAll();
     }
 }
